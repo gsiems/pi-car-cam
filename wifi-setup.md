@@ -12,12 +12,6 @@ edits, I tend to do just that as the edit is in-place, I find it easier
 than schlepping things around with sed, and it is less ambiguous than
 describing the edit to be made.
 
-### Given
-
-* A raspberry Pi-2b running Raspbian Jessie
-
-* A USB "Wi-Pi" dongle
-
 ### Install the necessary software
 
 ```
@@ -92,7 +86,8 @@ ifconfig wlan0 192.168.42.1
 ### Create /etc/hostapd/hostapd.conf
 
 Note that the driver may not actually be nl80211 (could be rtl871xdrv
-or something else depending on the WiFi dongle used)
+or something else depending on the WiFi dongle used). *Note:* change
+the SSID/password.
 
 ```
 cat<<'EOT'>/etc/hostapd/hostapd.conf
