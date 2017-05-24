@@ -131,7 +131,7 @@ Where:
 
 Note that, as of the 2.3 release of NMEA, there is a new field in the
 RMC sentence at the end just prior to the checksum. For more
-information on this field see here. <-- TODO: insert link
+information on this field see [here](http://www.gpsinformation.org/dale/nmea.htm#2.3).
 
 ### ZDA
 
