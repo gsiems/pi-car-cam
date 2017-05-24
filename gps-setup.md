@@ -34,7 +34,7 @@ Create the [init_ttyAMA0.sh](init_ttyAMA0.sh) script.
 
 ### NMEA Notes
 
-# To quote from http://www.gpsinformation.org/dale/nmea.htm:
+* To quote from http://www.gpsinformation.org/dale/nmea.htm:
 
 #### GGA
 
