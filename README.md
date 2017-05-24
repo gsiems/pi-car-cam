@@ -19,5 +19,5 @@ the shelf at the time. I don't believe it to be as sensitive as a
 dongle (could be wrong here and maybe that depends on the dongle) and
 it does complicate the desired form-factor a little but it does work.
 
-Miscellaneous other bits and pieces.
+* Miscellaneous other bits and pieces.
 

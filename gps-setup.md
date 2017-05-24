@@ -2,7 +2,7 @@
 
 ### Before attaching the GPS hat
 
-# Ref: https://learn.adafruit.com/adafruit-ultimate-gps-hat-for-raspberry-pi
+* Ref: https://learn.adafruit.com/adafruit-ultimate-gps-hat-for-raspberry-pi
 
 ```
 cat <<'EOT'>/boot/cmdline.txt
@@ -23,7 +23,7 @@ and having decided that the best trigger for starting a new reading is
 directly from the GPS hat output we're going to use pynmea2 rather than
 gpsd plus python-gps for obtaining the gps data.
 
-# https://github.com/Knio/pynmea2
+* Ref: https://github.com/Knio/pynmea2
 
 ```
 apt-get install python-pynmea2
@@ -84,18 +84,6 @@ fix. It is a unitless number where smaller is better. For 3D fixes
 using 4 satellites a 1.0 would be considered to be a perfect number,
 however for overdetermined solutions it is possible to see numbers
 below 1.0.
-
-There are differences in the way the PRN's are presented which can
-effect the ability of some programs to display this data. For example,
-in the example shown below there are 5 satellites in the solution and
-the null fields are scattered indicating that the almanac would show
-satellites in the null positions that are not being used as part of
-this solution. Other receivers might output all of the satellites used
-at the beginning of the sentence with the null field all stacked up at
-the end. This difference accounts for some satellite display programs
-not always being able to display the satellites being tracked. Some
-units may show all satellites that have ephemeris data without regard
-to their use as part of the solution but this is non-standard.
 
 ```
 $GPGSA,A,3,04,05,,09,12,,,24,,,,,2.5,1.3,2.1*39
