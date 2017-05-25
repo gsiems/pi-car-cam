@@ -19,7 +19,7 @@ the shelf at the time. I don't believe it to be as sensitive as a
 dongle (could be wrong here and maybe that depends on the dongle) and
 it does complicate the desired form-factor a little but it does work.
 
-* A USB "Wi-Pi" dongle
+* A USB ["Wi-Pi" dongle](https://www.element14.com/community/docs/DOC-69361/l/wifi-usb-dongle-for-raspberry-pi)
 
 * Miscellaneous other bits and pieces.
 
