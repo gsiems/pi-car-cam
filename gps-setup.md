@@ -20,8 +20,9 @@ systemctl disable serial-getty@ttyAMA0.service
 
 Having no guarantee that good a GPS signal will always be available,
 and having decided that the best trigger for starting a new reading is
-directly from the GPS hat output we're going to use pynmea2 rather than
-gpsd plus python-gps for obtaining the gps data.
+directly from the GPS hat output (there is an output every second
+regardless of having a fix or not) we're going to use pynmea2 rather
+than gpsd plus python-gps for obtaining the gps data.
 
 * Ref: https://github.com/Knio/pynmea2
 
