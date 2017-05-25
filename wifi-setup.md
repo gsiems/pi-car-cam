@@ -127,3 +127,13 @@ reboot
 ```
 
 At this point it should be possible to connect to the WiFi on the Pi from another device.
+
+### Steps
+
+* *WiFi setup*
+* [GPS setup](gps-setup.md)
+* [Camera setup](camera-setup.md)
+* Add button powered [shutdown](watch_4_shutdown.py) script
+* Add the [Picture taking/GPS reading](take_pics.py) script
+* [Boot setup](boot-setup.md)
+

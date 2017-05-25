@@ -159,3 +159,12 @@ where:
         yy        local zone minutes 0..59
         *CC       checksum
 ```
+
+### Steps
+
+* [WiFi setup](wifi-setup.md)
+* *GPS setup*
+* [Camera setup](camera-setup.md)
+* Add button powered [shutdown](watch_4_shutdown.py) script
+* Add the [Picture taking/GPS reading](take_pics.py) script
+* [Boot setup](boot-setup.md)

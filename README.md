@@ -30,4 +30,4 @@ it does complicate the desired form-factor a little but it does work.
 * [Camera setup](camera-setup.md)
 * Add button powered [shutdown](watch_4_shutdown.py) script
 * Add the [Picture taking/GPS reading](take_pics.py) script
-* Start it all on [boot](boot-setup.md)
+* [Boot setup](boot-setup.md)
