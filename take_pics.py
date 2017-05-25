@@ -84,14 +84,16 @@ def main ():
     reader = pynmea2.NMEAStreamReader(f)
 
     # It seems that there may be a certain amount of flushing needed
-    # initially to get the old values out of the stream. Reading data
-    # for a couple of seconds works; one second may also work. What
-    # doesn't work is relying on the GPS output. There is also the issue
-    # where the first reading from the stream isn't a full NMEA string
-    # and that can cause the reader to throw an exception. We don't
-    # really care about any initial errors as long as we don't continue
-    # to get errors-- if the errors continue then it may be necessary to
-    # verify that /dev/ttyAMA0 has been initialized.
+    # initially to get the old values out of the stream. Reading data for
+    # a couple of seconds works; one second may also work. What doesn't
+    # work is relying on the GPS output to indicate when the stream is
+    # "ready". There is also the issue where the first reading from the
+    # stream isn't always a full NMEA string and that can cause the
+    # reader to throw an exception. We don't really care about any
+    # initial errors as long as we don't continue to get errors-- if the
+    # errors continue then it may be necessary to verify that
+    # /dev/ttyAMA0 has been initialized.
+
     t0 = time.time()
     while (time.time() - t0) < 2:
         try:
