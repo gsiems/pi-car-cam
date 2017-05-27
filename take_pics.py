@@ -107,6 +107,7 @@ def main ():
     gga = '' # for holding the current $GPGGA output line
     gsa = '' # for holding the current $GPGSA output line
     rmc = '' # for holding the current $GPRMC output line
+    vtg = '' # for holding the current $GPVTG output line
     zda = '' # for holding the current $GPZDA output line
 
     print("Reading GPS data stream")
@@ -156,10 +157,12 @@ def main ():
                     gsa = tst
                 elif tst.find("RMC") > 0 and len(gga) > 0:
                     rmc = tst
+                elif tst.find("VTG") > 0 and len(gga) > 0:
+                    vtg = tst
                 elif tst.find("ZDA") > 0 and len(gga) > 0:
                     zda = tst
 
-                if ( len(gga) > 0 and len(gsa) > 0 and len(rmc) > 0 and len(zda) > 0 ):
+                if ( len(gga) > 0 and len(gsa) > 0 and len(rmc) > 0 and ( len(zda) > 0 or len(vtg) > 0 )):
 
                     # We want to take a picture every two seconds.
                     # Testing indicates that if we compare >= 2 then it
@@ -173,12 +176,13 @@ def main ():
                         # reset our timer value t1
                         t1 = time.time()
                         idx = idx + 1
-                        gps_info = "%i\n%s\n%s\n%s\n%s\n\n" % (guard, gga, gsa, rmc, zda)
+                        gps_info = "%i\n%s\n%s\n%s\n%s\n%s\n\n" % (guard, gga, gsa, rmc, vtg, zda)
                         take_picture (working_dir, idx, gps_info)
 
                     gga = ''
                     gsa = ''
                     rmc = ''
+                    vtg = ''
                     zda = ''
 
         except:

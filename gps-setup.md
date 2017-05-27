@@ -36,8 +36,8 @@ Create the [init_ttyAMA0.sh](init_ttyAMA0.sh) script.
 ### NMEA Notes
 
 The intent is to store all the NMEA data for each picture taken. The
-Wi-Pi USB dongle streams four NMEA lines per reading: $GPGGA, $GPGSA,
-$GPRMC, and $GPZDA
+Wi-Pi USB dongle appears to stream four NMEA lines per reading: $GPGGA, $GPGSA,
+$GPRMC, and either $GPVTG or $GPZDA
 
 * To quote from http://www.gpsinformation.org/dale/nmea.htm:
 
@@ -137,6 +137,26 @@ Where:
 Note that, as of the 2.3 release of NMEA, there is a new field in the
 RMC sentence at the end just prior to the checksum. For more
 information on this field see [here](http://www.gpsinformation.org/dale/nmea.htm#2.3).
+
+
+### VTG
+
+Velocity made good.
+
+```
+  $GPVTG,054.7,T,034.4,M,005.5,N,010.2,K*48
+```
+
+where:
+
+```
+        VTG          Track made good and ground speed
+        054.7,T      True track made good (degrees)
+        034.4,M      Magnetic track made good
+        005.5,N      Ground speed, knots
+        010.2,K      Ground speed, Kilometers per hour
+        *48          Checksum
+```
 
 ### ZDA
 
