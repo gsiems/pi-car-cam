@@ -7,13 +7,22 @@ import os, sys
 import time
 import serial
 import re
+import traceback
 
 from picamera import PiCamera
 import pynmea2
 
 gps_dev = '/dev/ttyAMA0'
+log_file = '/home/pi/take_pics.log'
 
-def get_session_dir():
+camera = PiCamera()
+
+def loggit (sl, msg):
+    sl.write(msg)
+    sl.write("\n")
+    sl.flush()
+
+def get_session_dir(sl):
     """ The idea here is to write the files to an external drive. On
     the Pi2 there are numbered directories under /media/pi-- we don't
     want to write to any of them. Instead, we want to write to the
@@ -62,24 +71,25 @@ def get_session_dir():
         if os.path.exists(path):
             return path
 
-    print ("Unable to determine session directory")
+    loggit(sl, "Unable to determine session directory")
     sys.exit()
-
-
-print("Seeking session directory")
-session_dir = get_session_dir()
-print("Session directory is %s" % session_dir)
-
-print("Initializing camera")
-camera = PiCamera()
-camera.start_preview()
-camera.resolution = (1600, 1200)
-time.sleep(10)
 
 
 def main ():
 
-    print("Opening GPS data stream")
+    sl = open(log_file, 'w+')
+    loggit(sl, "Seeking session directory")
+    session_dir = get_session_dir(sl)
+    loggit(sl, "Session directory is %s" % session_dir)
+
+    loggit(sl, "Initializing camera")
+    camera.start_preview()
+    camera.resolution = (1600, 1200)
+    time.sleep(10)
+    camera.capture('test_pic.jpg')
+
+    loggit(sl, "Opening GPS data stream")
+
     f = open(gps_dev)
     reader = pynmea2.NMEAStreamReader(f)
 
@@ -109,19 +119,20 @@ def main ():
     rmc = '' # for holding the current $GPRMC output line
     vtg = '' # for holding the current $GPVTG output line
     zda = '' # for holding the current $GPZDA output line
+    tst = None
 
-    print("Reading GPS data stream")
+    loggit(sl, "Reading GPS data stream")
     t1 = time.time()
 
     testing = False           # For short run testing purposes
     t0 = time.time()          # For short run testing purposes
-    guard = time.time() - t0  # For short run testing purposes
+    t_run = time.time() - t0  # For short run testing purposes
     while True:
 
         # Are we testing and is the test over?
-        guard = time.time() - t0
-        if testing and guard > 60:
-            print("Test run finished")
+        t_run = time.time() - t0
+        if testing and t_run > 60:
+            loggit(sl, "Test run finished")
             sys.exit()
 
         # Set the working dir to sub-directory to keep the files per
@@ -136,10 +147,10 @@ def main ():
                 os.makedirs(working_dir)
 
             if not os.path.exists(working_dir):
-                print("Unable to create working directory %s" % working_dir)
+                loggit(sl, "Unable to create working directory %s" % working_dir)
                 sys.exit()
 
-            print("Working directory is now %s" % working_dir)
+            loggit(sl, "Working directory is now %s" % working_dir)
 
         try:
             for msg in reader.next():
@@ -176,8 +187,8 @@ def main ():
                         # reset our timer value t1
                         t1 = time.time()
                         idx = idx + 1
-                        gps_info = "%i\n%s\n%s\n%s\n%s\n%s\n\n" % (guard, gga, gsa, rmc, vtg, zda)
-                        take_picture (working_dir, idx, gps_info)
+                        gps_info = "%i\n%s\n%s\n%s\n%s\n%s\n\n" % (t_run, gga, gsa, rmc, vtg, zda)
+                        take_picture (working_dir, idx, gps_info, sl)
 
                     gga = ''
                     gsa = ''
@@ -186,21 +197,30 @@ def main ():
                     zda = ''
 
         except:
-            print ("guard: %i ERROR" % guard)
+            loggit(sl, "ERROR! t_run = %i" % t_run)
+            loggit(sl, traceback.format_exc())
             pass
 
-def take_picture( working_dir, idx, gps_info ):
+def take_picture( working_dir, idx, gps_info, sl ):
     pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
     gps_file = ( '%s/%08i.gps' % (working_dir, idx) )
 
     try:
-        camera.capture(pic_file)
         fo = open(gps_file, "w")
         fo.write(gps_info)
         fo.close()
 
     except:
-        print ("Whoopsie! Could not take a picture for %s" % pic_file)
+        loggit(sl, "ERROR! Could not store GPS data for %s" % gps_file)
+        loggit(sl, traceback.format_exc())
+        throw
+
+    try:
+        camera.capture(pic_file)
+
+    except:
+        loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
+        loggit(sl, traceback.format_exc())
         throw
 
 if __name__ == '__main__':
