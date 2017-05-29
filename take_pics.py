@@ -39,37 +39,33 @@ def get_session_dir(sl):
     the sessions.
     """
 
-    dir_name = '/media/pi'
+    dir_name = '/home/pi/data'
     session = 0
     int_re = re.compile(r"^\d+$")
 
-    base_path = None
     for name in os.listdir(dir_name):
-        # Grab the first non-numeric directory name. Note that this may
-        # break if there are more than one non-numeric directory name
-        # hanging off of /media/pi
-        if int_re.match(str(name)) is None:
-            base_path = os.path.join(dir_name, name)
-            break
+        path = os.path.join(dir_name, name)
+        loggit(sl, "Checking path %s" % path)
 
-    if base_path is not None:
-        for name in os.listdir(base_path):
-            path = os.path.join(base_path, name)
+        if os.path.isdir(path):
+            loggit(sl, "   path %s is directory" % path)
 
-            if os.path.isdir(path):
-                if int_re.match(str(name)) is not None:
-                    if int(name) > session:
-                        session = int(name)
+            if int_re.match(str(name)) is not None:
+                loggit(sl, "   name %s is numeric" % name)
 
-        session = session + 1
+                if int(name) > session:
+                    session = int(name)
+                    loggit(sl, "      session %i" % session)
 
-        path = os.path.join(base_path, "%04i" % session)
+    session = session + 1
 
-        if not os.path.exists(path):
-            os.makedirs(path)
+    path = os.path.join(dir_name, "%04i" % session)
 
-        if os.path.exists(path):
-            return path
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    if os.path.exists(path):
+        return path
 
     loggit(sl, "Unable to determine session directory")
     sys.exit()
@@ -114,24 +110,20 @@ def main ():
     working_dir = session_dir
     idx = 0  # index number for naming the output files
     sdx = 0  # subdirectory index number for naming the subdirectories
-    gga = '' # for holding the current $GPGGA output line
-    gsa = '' # for holding the current $GPGSA output line
-    rmc = '' # for holding the current $GPRMC output line
-    vtg = '' # for holding the current $GPVTG output line
-    zda = '' # for holding the current $GPZDA output line
     tst = None
+    gps_data = ''
 
     loggit(sl, "Reading GPS data stream")
     t1 = time.time()
 
-    testing = False           # For short run testing purposes
+    testing = True           # For short run testing purposes
     t0 = time.time()          # For short run testing purposes
     t_run = time.time() - t0  # For short run testing purposes
     while True:
 
         # Are we testing and is the test over?
         t_run = time.time() - t0
-        if testing and t_run > 60:
+        if testing and t_run > 20:
             loggit(sl, "Test run finished")
             sys.exit()
 
@@ -163,17 +155,6 @@ def main ():
                 # the same moment in time. That is, done't populate the
                 # other values until we've seen the GGA value.
                 if tst.find("GGA") > 0:
-                    gga = tst
-                elif tst.find("GSA") > 0 and len(gga) > 0:
-                    gsa = tst
-                elif tst.find("RMC") > 0 and len(gga) > 0:
-                    rmc = tst
-                elif tst.find("VTG") > 0 and len(gga) > 0:
-                    vtg = tst
-                elif tst.find("ZDA") > 0 and len(gga) > 0:
-                    zda = tst
-
-                if ( len(gga) > 0 and len(gsa) > 0 and len(rmc) > 0 and ( len(zda) > 0 or len(vtg) > 0 )):
 
                     # We want to take a picture every two seconds.
                     # Testing indicates that if we compare >= 2 then it
@@ -186,23 +167,38 @@ def main ():
                         # At this point we want to take a picture and
                         # reset our timer value t1
                         t1 = time.time()
-                        idx = idx + 1
-                        gps_info = "%i\n%s\n%s\n%s\n%s\n%s\n\n" % (t_run, gga, gsa, rmc, vtg, zda)
-                        take_picture (working_dir, idx, gps_info, sl)
 
-                    gga = ''
-                    gsa = ''
-                    rmc = ''
-                    vtg = ''
-                    zda = ''
+                        # Write the previous GPS data
+                        if idx > 0:
+                            gps_info = "%i\n%s\n\n" % (t_run, gps_data)
+                            write_gps_data (working_dir, idx, gps_info, sl)
+
+                        # Take the current picture
+                        idx = idx + 1
+                        take_picture (working_dir, idx, sl)
+
+                    gps_data = tst + "\n"
+
+                else:
+                    gps_data = gps_data + tst + "\n"
 
         except:
             loggit(sl, "ERROR! t_run = %i" % t_run)
             loggit(sl, traceback.format_exc())
             pass
 
-def take_picture( working_dir, idx, gps_info, sl ):
+def take_picture( working_dir, idx, sl ):
     pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
+
+    try:
+        camera.capture(pic_file)
+
+    except:
+        loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
+        loggit(sl, traceback.format_exc())
+        throw
+
+def write_gps_data( working_dir, idx, gps_info, sl ):
     gps_file = ( '%s/%08i.gps' % (working_dir, idx) )
 
     try:
@@ -215,13 +211,6 @@ def take_picture( working_dir, idx, gps_info, sl ):
         loggit(sl, traceback.format_exc())
         throw
 
-    try:
-        camera.capture(pic_file)
-
-    except:
-        loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
-        loggit(sl, traceback.format_exc())
-        throw
 
 if __name__ == '__main__':
     main()
