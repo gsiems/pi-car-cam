@@ -1,28 +1,65 @@
 #!/usr/bin/env python
 
-# Uses pynmea2 rather than gpsd plus python-gps for obtaining the gps data
-# https://github.com/Knio/pynmea2
+# No longer uses pynmea2 (https://github.com/Knio/pynmea2) for obtaining
+# the gps data. Doesn't user gpsd plus python-gps either. Simply uses
+# serial to read the GPS dev output.
 
 import os, sys
 import time
 import serial
 import re
-import traceback
-
 from picamera import PiCamera
-import pynmea2
 
 gps_dev = '/dev/ttyAMA0'
 log_file = '/home/pi/take_pics.log'
+data_dir = '/home/pi/data'
+pic_int = 2 # seconds between pictures
 
 camera = PiCamera()
+
+class GPSDev:
+    # Ref: http://doschman.blogspot.com/2013/01/parsing-nmea-sentences-from-gps-with.html
+
+    def __init__(self, serialport, baudratespeed):
+
+        self.gpsdevice = serial.Serial(port=serialport, baudrate=baudratespeed, timeout=10)
+
+        self.init()
+
+    def init(self):
+        if self.isOpen():
+            return True
+
+        return False
+
+    def open(self):
+        self.gpsdevice.open()
+
+    def isOpen(self):
+        return self.gpsdevice.isOpen()
+
+    def readBuffer(self):
+        data = ''
+        try:
+            data = self.gpsdevice.read(1)
+            n = self.gpsdevice.inWaiting()
+            if n:
+                data = data + self.gpsdevice.read(n)
+
+        except Exception, e:
+            print "Big time read error, what happened: ", e
+            #sys.exit(1)
+            pass
+
+        return data
+
 
 def loggit (sl, msg):
     sl.write(msg)
     sl.write("\n")
     sl.flush()
 
-def get_session_dir(sl):
+def get_session_dir(sl, dir_name):
     """ The idea here is to write the files to an external drive. On
     the Pi2 there are numbered directories under /media/pi-- we don't
     want to write to any of them. Instead, we want to write to the
@@ -39,7 +76,6 @@ def get_session_dir(sl):
     the sessions.
     """
 
-    dir_name = '/home/pi/data'
     session = 0
     int_re = re.compile(r"^\d+$")
 
@@ -68,14 +104,14 @@ def get_session_dir(sl):
         return path
 
     loggit(sl, "Unable to determine session directory")
-    sys.exit()
+    sys.exit(1)
 
 
 def main ():
 
     sl = open(log_file, 'w+')
     loggit(sl, "Seeking session directory")
-    session_dir = get_session_dir(sl)
+    session_dir = get_session_dir(sl, data_dir)
     loggit(sl, "Session directory is %s" % session_dir)
 
     loggit(sl, "Initializing camera")
@@ -86,44 +122,32 @@ def main ():
 
     loggit(sl, "Opening GPS data stream")
 
-    f = open(gps_dev)
-    reader = pynmea2.NMEAStreamReader(f)
+    reader = GPSDev(gps_dev, 9600)
+    if not reader.isOpen():
+        loggit(sl, "ERROR!: Could not open GPS data stream")
+        sys.exit(1)
 
     # It seems that there may be a certain amount of flushing needed
-    # initially to get the old values out of the stream. Reading data for
-    # a couple of seconds works; one second may also work. What doesn't
-    # work is relying on the GPS output to indicate when the stream is
-    # "ready". There is also the issue where the first reading from the
-    # stream isn't always a full NMEA string and that can cause the
-    # reader to throw an exception. We don't really care about any
-    # initial errors as long as we don't continue to get errors-- if the
-    # errors continue then it may be necessary to verify that
-    # /dev/ttyAMA0 has been initialized.
-
-    t0 = time.time()
-    while (time.time() - t0) < 2:
-        try:
-            reader.next()
-        except:
-            pass
+    # initially to get the old values out of the stream. We don't want
+    # to immediately take a slew of pictures just because of "old" data
+    reader.readBuffer()
 
     working_dir = session_dir
     idx = 0  # index number for naming the output files
     sdx = 0  # subdirectory index number for naming the subdirectories
-    tst = None
     gps_data = ''
+    buf = ''
+    line = ''
 
     loggit(sl, "Reading GPS data stream")
-    t1 = time.time()
 
     testing = True           # For short run testing purposes
-    t0 = time.time()          # For short run testing purposes
-    t_run = time.time() - t0  # For short run testing purposes
-    while True:
+    t0 = time.time()
+    t1 = time.time()
+    while reader.isOpen():
 
         # Are we testing and is the test over?
-        t_run = time.time() - t0
-        if testing and t_run > 20:
+        if testing and idx > 10:
             loggit(sl, "Test run finished")
             sys.exit()
 
@@ -140,52 +164,56 @@ def main ():
 
             if not os.path.exists(working_dir):
                 loggit(sl, "Unable to create working directory %s" % working_dir)
-                sys.exit()
+                sys.exit(1)
 
             loggit(sl, "Working directory is now %s" % working_dir)
 
-        try:
-            for msg in reader.next():
+        # Feed the buffer
+        buf = buf + reader.readBuffer()
 
-                tst = str(msg)
+        # Have we read one or more nmea lines into our buffer?
+        while re.search("\n", buf):
 
-                # For the GPS hat at least, the first line out for a
-                # given point in time will be the $GPGGA line. Therefore
-                # we can use that to ensure that the readings are all for
-                # the same moment in time. That is, done't populate the
-                # other values until we've seen the GGA value.
-                if tst.find("GGA") > 0:
+            # Grab the first line from the buffer
+            line, buf = buf.split("\n", 1)
 
-                    # We want to take a picture every two seconds.
-                    # Testing indicates that if we compare >= 2 then it
-                    # will sometimes be three seconds between pictures
-                    # and if we compare > 1 then it will sometimes be
-                    # only one second between pictures. Testing against
-                    # a value just a bit under 2 (like 1.9) should work
-                    # just fine.
-                    if (time.time() - t1) * 1.0 >= 1.9:
-                        # At this point we want to take a picture and
-                        # reset our timer value t1
-                        t1 = time.time()
+            # For the GPS hat at least, the first line out for a
+            # given point in time will be the $GPGGA line. Therefore
+            # we can use that to ensure that the readings are all for
+            # the same moment in time.
+            if line.find("GGA") > 0:
 
-                        # Write the previous GPS data
-                        if idx > 0:
-                            gps_info = "%i\n%s\n\n" % (t_run, gps_data)
-                            write_gps_data (working_dir, idx, gps_info, sl)
+                # Remember that we only want to take a picture every
+                # pic_int seconds
 
-                        # Take the current picture
-                        idx = idx + 1
-                        take_picture (working_dir, idx, sl)
+                # We want to take a picture every pic_int seconds.
+                # Testing indicates that pic_int == 2 and if we
+                # compare >= 2 then it will sometimes be three seconds
+                # between pictures and if we compare > 1 then it will
+                # sometimes be only one second between pictures.
+                # Testing against a value just a bit under 2 (like 1.9)
+                # should work just fine.
+                if (time.time() - t1) * 1.0 >= pic_int * 1.0 - 0.1:
+                    # At this point we want to take a picture and
+                    # reset our timer value t1
+                    t1 = time.time()
 
-                    gps_data = tst + "\n"
+                    # Write the previous GPS data
+                    if idx > 0:
+                        t_run = time.time() - t0
+                        gps_info = "%i\n%s\n\n" % (t_run, gps_data)
+                        write_gps_data (working_dir, idx, gps_info, sl)
 
-                else:
-                    gps_data = gps_data + tst + "\n"
+                    # Take the current picture
+                    idx = idx + 1
+                    take_picture (working_dir, idx, sl)
 
-        except:
-            loggit(sl, "ERROR! t_run = %i" % t_run)
-            loggit(sl, traceback.format_exc())
-            pass
+                # Start accumulating GPS data for the current time interval
+                gps_data = line + "\n"
+
+            else:
+                gps_data = gps_data + line + "\n"
+
 
 def take_picture( working_dir, idx, sl ):
     pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
@@ -193,9 +221,9 @@ def take_picture( working_dir, idx, sl ):
     try:
         camera.capture(pic_file)
 
-    except:
+    except Exception, e:
         loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
-        loggit(sl, traceback.format_exc())
+        loggit(sl, e)
         throw
 
 def write_gps_data( working_dir, idx, gps_info, sl ):
@@ -206,9 +234,9 @@ def write_gps_data( working_dir, idx, gps_info, sl ):
         fo.write(gps_info)
         fo.close()
 
-    except:
+    except Exception, e:
         loggit(sl, "ERROR! Could not store GPS data for %s" % gps_file)
-        loggit(sl, traceback.format_exc())
+        loggit(sl, e)
         throw
 
 
