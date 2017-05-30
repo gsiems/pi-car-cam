@@ -1,5 +1,8 @@
 # Camera setup
 
+```
+sudo apt-get install python-picamera
+```
 
 ### Steps
 
