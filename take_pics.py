@@ -14,16 +14,26 @@ gps_dev = '/dev/ttyAMA0'
 log_file = '/home/pi/take_pics.log'
 data_dir = '/home/pi/data'
 pic_int = 2 # seconds between pictures
+testing = False           # For short run testing purposes
 
 camera = PiCamera()
 
-class GPSDev:
+class GPStream:
     # Ref: http://doschman.blogspot.com/2013/01/parsing-nmea-sentences-from-gps-with.html
 
-    def __init__(self, serialport, baudratespeed):
+    def __init__(self, serialport, baudratespeed, sl):
 
         self.gpsdevice = serial.Serial(port=serialport, baudrate=baudratespeed, timeout=10)
+        self.serialport = serialport
+        self.baudratespeed = baudratespeed
+        self.sl = sl
+        self.error_count = 0
 
+        self.init()
+
+    def reopen(self):
+        self.gpsdevice.close()
+        self.gpsdevice = serial.Serial(port=self.serialport, baudrate=self.baudratespeed, timeout=5)
         self.init()
 
     def init(self):
@@ -34,6 +44,9 @@ class GPSDev:
 
     def open(self):
         self.gpsdevice.open()
+
+    def close(self):
+        self.gpsdevice.close()
 
     def isOpen(self):
         return self.gpsdevice.isOpen()
@@ -47,9 +60,16 @@ class GPSDev:
                 data = data + self.gpsdevice.read(n)
 
         except Exception, e:
-            print "Big time read error, what happened: ", e
-            #sys.exit(1)
-            pass
+            sl.write("Big time read error, what happened:\n")
+            sl.write(e)
+            sl.write("\n")
+            sl.flush()
+            self.error_count = self.error_count + 1
+
+            if self.error_count < 10:
+                self.reopen()
+            else:
+                sys.exit(1)
 
         return data
 
@@ -81,17 +101,17 @@ def get_session_dir(sl, dir_name):
 
     for name in os.listdir(dir_name):
         path = os.path.join(dir_name, name)
-        loggit(sl, "Checking path %s" % path)
+        #loggit(sl, "Checking path %s" % path)
 
         if os.path.isdir(path):
-            loggit(sl, "   path %s is directory" % path)
+            #loggit(sl, "   path %s is directory" % path)
 
             if int_re.match(str(name)) is not None:
-                loggit(sl, "   name %s is numeric" % name)
+                #loggit(sl, "   name %s is numeric" % name)
 
                 if int(name) > session:
                     session = int(name)
-                    loggit(sl, "      session %i" % session)
+                    #loggit(sl, "      session %i" % session)
 
     session = session + 1
 
@@ -101,6 +121,7 @@ def get_session_dir(sl, dir_name):
         os.makedirs(path)
 
     if os.path.exists(path):
+        loggit(sl, "Session path is: %s" % path)
         return path
 
     loggit(sl, "Unable to determine session directory")
@@ -114,15 +135,20 @@ def main ():
     session_dir = get_session_dir(sl, data_dir)
     loggit(sl, "Session directory is %s" % session_dir)
 
+    sess_log_file = ( '%s/session.log' % session_dir )
+    sl.close()
+    sl = open(sess_log_file, 'w+')
+
+
     loggit(sl, "Initializing camera")
     camera.start_preview()
     camera.resolution = (1600, 1200)
     time.sleep(10)
-    camera.capture('test_pic.jpg')
+    #camera.capture('test_pic.jpg')
 
     loggit(sl, "Opening GPS data stream")
 
-    reader = GPSDev(gps_dev, 9600)
+    reader = GPStream(gps_dev, 9600, sl)
     if not reader.isOpen():
         loggit(sl, "ERROR!: Could not open GPS data stream")
         sys.exit(1)
@@ -141,7 +167,6 @@ def main ():
 
     loggit(sl, "Reading GPS data stream")
 
-    testing = True           # For short run testing purposes
     t0 = time.time()
     t1 = time.time()
     while reader.isOpen():
@@ -194,26 +219,22 @@ def main ():
                 # Testing against a value just a bit under 2 (like 1.9)
                 # should work just fine.
                 if (time.time() - t1) * 1.0 >= pic_int * 1.0 - 0.1:
-                    # At this point we want to take a picture and
-                    # reset our timer value t1
-                    t1 = time.time()
 
                     # Write the previous GPS data
-                    if idx > 0:
-                        t_run = time.time() - t0
-                        gps_info = "%i\n%s\n\n" % (t_run, gps_data)
-                        write_gps_data (working_dir, idx, gps_info, sl)
+                    t_run = time.time() - t0
+                    write_gps_data (working_dir, idx, gps_data, sl)
+
+                    # Start accumulating the current GPS data
+                    gps_data = "%i\r\n" % t_run
 
                     # Take the current picture
                     idx = idx + 1
                     take_picture (working_dir, idx, sl)
 
-                # Start accumulating GPS data for the current time interval
-                gps_data = line + "\n"
+                    # Reset our timer value t1
+                    t1 = time.time()
 
-            else:
-                gps_data = gps_data + line + "\n"
-
+            gps_data = gps_data + line + "\n"
 
 def take_picture( working_dir, idx, sl ):
     pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
