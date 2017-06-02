@@ -60,10 +60,10 @@ class GPStream:
                 data = data + self.gpsdevice.read(n)
 
         except Exception, e:
-            sl.write("Big time read error, what happened:\n")
-            sl.write(e)
-            sl.write("\n")
-            sl.flush()
+            self.sl.write("Big time read error, what happened:\n")
+            self.sl.write(e)
+            self.sl.write("\n")
+            self.sl.flush()
             self.error_count = self.error_count + 1
 
             if self.error_count < 10:
