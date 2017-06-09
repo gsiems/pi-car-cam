@@ -5,11 +5,13 @@
 * Ref: https://learn.adafruit.com/adafruit-ultimate-gps-hat-for-raspberry-pi
 
 ```
+cp -a /boot/cmdline.txt{,.orig}
+
 cat <<'EOT'>/boot/cmdline.txt
 dwc_otg.lpm_enable=0 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait
 EOT
 
-systemctl disable serial-getty@ttyAMA0.service
+systemctl stop serial-getty@ttyAMA0.service
 
 systemctl disable serial-getty@ttyAMA0.service
 ```
