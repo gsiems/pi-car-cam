@@ -23,7 +23,10 @@ class GPStream:
 
     def __init__(self, serialport, baudratespeed, sl):
 
-        self.gpsdevice = serial.Serial(port=serialport, baudrate=baudratespeed, timeout=10)
+        self.gpsdevice = serial.Serial(port=serialport, baudrate=baudratespeed,
+            bytesize=serial.EIGHTBITS, stopbits=serial.STOPBITS_ONE,
+            xonxoff=False, timeout=5)
+
         self.serialport = serialport
         self.baudratespeed = baudratespeed
         self.sl = sl
@@ -33,7 +36,10 @@ class GPStream:
 
     def reopen(self):
         self.gpsdevice.close()
-        self.gpsdevice = serial.Serial(port=self.serialport, baudrate=self.baudratespeed, timeout=5)
+        self.gpsdevice = serial.Serial(port=self.serialport, baudrate=self.baudratespeed,
+            bytesize=serial.EIGHTBITS, stopbits=serial.STOPBITS_ONE,
+            xonxoff=False, timeout=5)
+
         self.init()
 
     def init(self):
@@ -60,16 +66,17 @@ class GPStream:
                 data = data + self.gpsdevice.read(n)
 
         except Exception, e:
-            self.sl.write("Big time read error, what happened:\n")
-            self.sl.write(e)
-            self.sl.write("\n")
-            self.sl.flush()
             self.error_count = self.error_count + 1
+            self.sl.write("Big time read error (%i), what happened:\n" % self.error_count)
+            #self.sl.write(e.args)
+            #self.sl.write("\n")
+            self.sl.flush()
 
-            if self.error_count < 10:
-                self.reopen()
-            else:
-                sys.exit(1)
+            self.reopen()
+            #if self.error_count < 10:
+            #    self.reopen()
+            #else:
+            #    sys.exit(1)
 
         return data
 
@@ -139,6 +146,9 @@ def main ():
     sl.close()
     sl = open(sess_log_file, 'w+')
 
+    sess_gps_file = ( '%s/session.gps' % session_dir )
+    gpsl = open(sess_gps_file, 'w+')
+
 
     loggit(sl, "Initializing camera")
     camera.start_preview()
@@ -169,7 +179,7 @@ def main ():
 
     t0 = time.time()
     t1 = time.time()
-    while reader.isOpen():
+    while True:
 
         # Are we testing and is the test over?
         if testing and idx > 10:
@@ -218,48 +228,30 @@ def main ():
                 # sometimes be only one second between pictures.
                 # Testing against a value just a bit under 2 (like 1.9)
                 # should work just fine.
-                if (time.time() - t1) * 1.0 >= pic_int * 1.0 - 0.1:
+                if time.time() - t1 >= pic_int - 0.2:
 
                     # Write the previous GPS data
                     t_run = time.time() - t0
-                    write_gps_data (working_dir, idx, gps_data, sl)
-
-                    # Start accumulating the current GPS data
-                    gps_data = "%i\r\n" % t_run
 
                     # Take the current picture
                     idx = idx + 1
-                    take_picture (working_dir, idx, sl)
+                    pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
+                    gpsl.write("PICTURE:" + pic_file + "\r\n")
+                    gpsl.flush()
+
+                    try:
+                        camera.capture(pic_file)
+
+                    except Exception, e:
+                        loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
+                        loggit(sl, e)
+                        pass
 
                     # Reset our timer value t1
                     t1 = time.time()
 
-            gps_data = gps_data + line + "\n"
-
-def take_picture( working_dir, idx, sl ):
-    pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
-
-    try:
-        camera.capture(pic_file)
-
-    except Exception, e:
-        loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
-        loggit(sl, e)
-        throw
-
-def write_gps_data( working_dir, idx, gps_info, sl ):
-    gps_file = ( '%s/%08i.gps' % (working_dir, idx) )
-
-    try:
-        fo = open(gps_file, "w")
-        fo.write(gps_info)
-        fo.close()
-
-    except Exception, e:
-        loggit(sl, "ERROR! Could not store GPS data for %s" % gps_file)
-        loggit(sl, e)
-        throw
-
+            gpsl.write(line + "\n")
+            gpsl.flsuh()
 
 if __name__ == '__main__':
     main()
