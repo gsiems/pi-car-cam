@@ -9,12 +9,18 @@ import time
 import serial
 import re
 from picamera import PiCamera
+import RPi.GPIO as gpio
 
 gps_dev = '/dev/ttyAMA0'
 log_file = '/home/pi/take_pics.log'
 data_dir = '/home/pi/data'
 pic_int = 2 # seconds between pictures
 testing = False           # For short run testing purposes
+
+led = 16
+gpio.setmode(gpio.BOARD)
+gpio.setup(led, gpio.OUT)
+gpio.output(led, False)
 
 camera = PiCamera()
 
@@ -241,17 +247,21 @@ def main ():
 
                     try:
                         camera.capture(pic_file)
+                        gpio.output(led, True)
+                        time.sleep(0.1)
 
                     except Exception, e:
                         loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
                         loggit(sl, e)
                         pass
 
+                    gpio.output(led, False)
+
                     # Reset our timer value t1
                     t1 = time.time()
 
             gpsl.write(line + "\n")
-            gpsl.flsuh()
+            gpsl.flush()
 
 if __name__ == '__main__':
     main()
