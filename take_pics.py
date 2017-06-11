@@ -11,13 +11,13 @@ import re
 from picamera import PiCamera
 import RPi.GPIO as gpio
 
-gps_dev = '/dev/ttyAMA0'
 log_file = '/home/pi/take_pics.log'
 data_dir = '/home/pi/data'
 pic_int = 2 # seconds between pictures
 testing = False           # For short run testing purposes
 
 led = 16
+gpio.setwarnings(False)
 gpio.setmode(gpio.BOARD)
 gpio.setup(led, gpio.OUT)
 gpio.output(led, False)
@@ -25,28 +25,21 @@ gpio.output(led, False)
 camera = PiCamera()
 
 class GPStream:
-    # Ref: http://doschman.blogspot.com/2013/01/parsing-nmea-sentences-from-gps-with.html
 
-    def __init__(self, serialport, baudratespeed, sl):
+    def __init__(self, sl):
 
-        self.gpsdevice = serial.Serial(port=serialport, baudrate=baudratespeed,
-            bytesize=serial.EIGHTBITS, stopbits=serial.STOPBITS_ONE,
-            xonxoff=False, timeout=5)
-
-        self.serialport = serialport
-        self.baudratespeed = baudratespeed
+        self.port = '/dev/ttyAMA0'
+        self.baudrate = 9600
+        self.timeout = 5
         self.sl = sl
         self.error_count = 0
 
-        self.init()
+        try:
+            self.gpsdevice = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
 
-    def reopen(self):
-        self.gpsdevice.close()
-        self.gpsdevice = serial.Serial(port=self.serialport, baudrate=self.baudratespeed,
-            bytesize=serial.EIGHTBITS, stopbits=serial.STOPBITS_ONE,
-            xonxoff=False, timeout=5)
-
-        self.init()
+        except serial.SerialException as e:
+            self.sl.write("Could not open GPS device '{}': {}".format(self.port, e))
+            self.sl.flush()
 
     def init(self):
         if self.isOpen():
@@ -54,35 +47,38 @@ class GPStream:
 
         return False
 
-    def open(self):
-        self.gpsdevice.open()
-
-    def close(self):
-        self.gpsdevice.close()
-
     def isOpen(self):
         return self.gpsdevice.isOpen()
 
-    def readBuffer(self):
-        data = ''
+    def reopen(self):
         try:
-            data = self.gpsdevice.read(1)
-            n = self.gpsdevice.inWaiting()
-            if n:
-                data = data + self.gpsdevice.read(n)
+            self.gpsdevice.close()
+        except:
+            pass
 
-        except Exception, e:
-            self.error_count = self.error_count + 1
-            self.sl.write("Big time read error (%i), what happened:\n" % self.error_count)
-            #self.sl.write(e.args)
-            #self.sl.write("\n")
+        try:
+            sleep(.05)
+            self.gpsdevice.open()
+
+        except serial.SerialException as e:
+            self.sl.write("Could not reopen GPS device '{}': {}".format(self.port, e))
             self.sl.flush()
 
+    def readBuffer(self):
+        data = ''
+        if self.isOpen():
+            try:
+                n = self.gpsdevice.inWaiting()
+                if n:
+                    data = self.gpsdevice.read(n)
+
+            except serial.SerialException as e:
+                self.sl.write("Read error on GPS device '{}': {}".format(self.port, e))
+                self.sl.flush()
+                self.reopen()
+
+        else:
             self.reopen()
-            #if self.error_count < 10:
-            #    self.reopen()
-            #else:
-            #    sys.exit(1)
 
         return data
 
@@ -164,7 +160,7 @@ def main ():
 
     loggit(sl, "Opening GPS data stream")
 
-    reader = GPStream(gps_dev, 9600, sl)
+    reader = GPStream(sl)
     if not reader.isOpen():
         loggit(sl, "ERROR!: Could not open GPS data stream")
         sys.exit(1)
