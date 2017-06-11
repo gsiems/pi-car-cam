@@ -8,4 +8,8 @@ echo "#################################################################" >> /hom
 date >> /home/pi/data/messages.stop
 cat /var/log/messages >> /home/pi/data/messages.stop
 
+echo "#################################################################" >> /home/pi/data/meminfo.stop
+date >> /home/pi/data/meminfo.stop
+cat /proc/meminfo >> /home/pi/data/meminfo.stop
+
 sudo shutdown -h now

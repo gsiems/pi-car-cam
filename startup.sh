@@ -26,6 +26,10 @@ if [ -z "$tst" ]; then
     date >> /home/pi/data/messages.start
     cat /var/log/messages >> /home/pi/data/messages.start
 
+    echo "#################################################################" >> /home/pi/data/meminfo.start
+    date >> /home/pi/data/meminfo.start
+    cat /proc/meminfo >> /home/pi/data/meminfo.start
+
     echo "" >> /home/pi/data/take_pics.out
     date >> /home/pi/data/take_pics.out
     /home/pi/take_pics.py >> /home/pi/data/take_pics.out 2>&1 &
