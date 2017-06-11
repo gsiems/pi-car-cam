@@ -17,6 +17,15 @@ fi
 #pgrep take_pics.py || /home/pi/take_pics.py &
 tst=`ps -ef | grep \[t]ake_pics\.py`
 if [ -z "$tst" ]; then
+
+    echo "#################################################################" >> /home/pi/data/dmesg.start
+    date >> /home/pi/data/dmesg.start
+    dmesg >> /home/pi/data/dmesg.start
+
+    echo "#################################################################" >> /home/pi/data/messages.start
+    date >> /home/pi/data/messages.start
+    cat /var/log/messages >> /home/pi/data/messages.start
+
     echo "" >> /home/pi/data/take_pics.out
     date >> /home/pi/data/take_pics.out
     /home/pi/take_pics.py >> /home/pi/data/take_pics.out 2>&1 &
