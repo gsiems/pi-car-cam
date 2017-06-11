@@ -35,7 +35,7 @@ def main ():
     if testing:
         print ("Goodbye\n")
     else:
-        os.system('sudo shutdown now -h')
+        os.system('/home/pi/shutdown.sh')
 
     exit
 
