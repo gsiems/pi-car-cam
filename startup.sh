@@ -18,17 +18,17 @@ fi
 tst=`ps -ef | grep \[t]ake_pics\.py`
 if [ -z "$tst" ]; then
 
-    echo "#################################################################" >> /home/pi/data/dmesg.start
-    date >> /home/pi/data/dmesg.start
-    dmesg >> /home/pi/data/dmesg.start
+    #echo "#################################################################" >> /home/pi/data/dmesg.start
+    #date >> /home/pi/data/dmesg.start
+    #dmesg >> /home/pi/data/dmesg.start
 
-    echo "#################################################################" >> /home/pi/data/messages.start
-    date >> /home/pi/data/messages.start
-    cat /var/log/messages >> /home/pi/data/messages.start
+    #echo "#################################################################" >> /home/pi/data/messages.start
+    #date >> /home/pi/data/messages.start
+    #cat /var/log/messages >> /home/pi/data/messages.start
 
-    echo "#################################################################" >> /home/pi/data/meminfo.start
-    date >> /home/pi/data/meminfo.start
-    cat /proc/meminfo >> /home/pi/data/meminfo.start
+    #echo "#################################################################" >> /home/pi/data/meminfo.start
+    #date >> /home/pi/data/meminfo.start
+    #cat /proc/meminfo >> /home/pi/data/meminfo.start
 
     echo "" >> /home/pi/data/take_pics.out
     date >> /home/pi/data/take_pics.out
