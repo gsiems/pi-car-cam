@@ -16,15 +16,62 @@ data_dir = '/home/pi/data'
 pic_int = 2 # seconds between pictures
 testing = False           # For short run testing purposes
 
-led = 16
-gpio.setwarnings(False)
-gpio.setmode(gpio.BOARD)
-gpio.setup(led, gpio.OUT)
-gpio.output(led, False)
+led_pin = 16
 
 camera = PiCamera()
 
+class Logger:
+
+    def __init__(self, log_file):
+
+        self.log_file = log_file
+        self.sl = open(self.log_file, 'w+')
+
+
+    def close(self):
+        self.sl.close()
+
+    def switchFile(self, log_file):
+        try:
+            self.sl.close()
+        except:
+            pass
+
+        self.log_file = log_file
+        self.sl = open(self.log_file, 'w+')
+
+    def write(self, message):
+        self.sl.write(message)
+        self.sl.flush()
+
+    def say(self, message):
+        self.sl.write(message + "\n")
+        self.sl.flush()
+
+class LED:
+
+    def __init__(self, pin_no):
+
+        self.pin_no = pin_no
+
+        gpio.setwarnings(False)
+        gpio.setmode(gpio.BOARD)
+        gpio.setup(self.pin_no, gpio.OUT)
+        self.flash()
+
+    def flash(self, duration=0.1):
+        self.on()
+        time.sleep(duration)
+        self.off()
+
+    def off(self):
+        gpio.output(self.pin_no, False)
+
+    def on(self):
+        gpio.output(self.pin_no, True)
+
 class GPStream:
+
 
     def __init__(self, sl):
 
@@ -38,17 +85,22 @@ class GPStream:
             self.gpsdevice = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
 
         except serial.SerialException as e:
-            self.sl.write("Could not open GPS device '{}': {}".format(self.port, e))
-            self.sl.flush()
+            self.sl.say("Could not open GPS device '{}': {}".format(self.port, e))
 
-    def init(self):
-        if self.isOpen():
-            return True
-
-        return False
+#    def init(self):
+#        if self.isOpen():
+#            return True
+#
+#        return False
 
     def isOpen(self):
-        return self.gpsdevice.isOpen()
+        try:
+            if self.gpsdevice.isOpen():
+                return True
+        except serial.SerialException as e:
+            self.sl.say("Could not check GPS device status '{}': {}".format(self.port, e))
+
+        return False
 
     def reopen(self):
         try:
@@ -57,12 +109,11 @@ class GPStream:
             pass
 
         try:
-            sleep(.05)
+            time.sleep(0.1)
             self.gpsdevice.open()
 
         except serial.SerialException as e:
-            self.sl.write("Could not reopen GPS device '{}': {}".format(self.port, e))
-            self.sl.flush()
+            self.sl.say("Could not reopen GPS device '{}': {}".format(self.port, e))
 
     def readBuffer(self):
         data = ''
@@ -72,21 +123,15 @@ class GPStream:
                 if n:
                     data = self.gpsdevice.read(n)
 
-            except serial.SerialException as e:
-                self.sl.write("Read error on GPS device '{}': {}".format(self.port, e))
-                self.sl.flush()
+            except Exception as e:
+            #except serial.SerialException as e:
+                self.sl.say("Read error on GPS device '{}': {}".format(self.port, e))
                 self.reopen()
 
         else:
             self.reopen()
 
         return data
-
-
-def loggit (sl, msg):
-    sl.write(msg)
-    sl.write("\n")
-    sl.flush()
 
 def get_session_dir(sl, dir_name):
     """ The idea here is to write the files to an external drive. On
@@ -110,17 +155,17 @@ def get_session_dir(sl, dir_name):
 
     for name in os.listdir(dir_name):
         path = os.path.join(dir_name, name)
-        #loggit(sl, "Checking path %s" % path)
+        #sl.say("Checking path %s" % path)
 
         if os.path.isdir(path):
-            #loggit(sl, "   path %s is directory" % path)
+            #sl.say("   path %s is directory" % path)
 
             if int_re.match(str(name)) is not None:
-                #loggit(sl, "   name %s is numeric" % name)
+                #sl.say("   name %s is numeric" % name)
 
                 if int(name) > session:
                     session = int(name)
-                    #loggit(sl, "      session %i" % session)
+                    #sl.say("      session %i" % session)
 
     session = session + 1
 
@@ -130,54 +175,54 @@ def get_session_dir(sl, dir_name):
         os.makedirs(path)
 
     if os.path.exists(path):
-        loggit(sl, "Session path is: %s" % path)
+        sl.say("Session path is: %s" % path)
         return path
 
-    loggit(sl, "Unable to determine session directory")
+    sl.say("Unable to determine session directory")
     sys.exit(1)
 
 
 def main ():
 
-    sl = open(log_file, 'w+')
-    loggit(sl, "Seeking session directory")
+    sl = Logger(log_file)
+    sl.say("Seeking session directory")
     session_dir = get_session_dir(sl, data_dir)
-    loggit(sl, "Session directory is %s" % session_dir)
+    sl.say("Session directory is %s" % session_dir)
 
     sess_log_file = ( '%s/session.log' % session_dir )
-    sl.close()
-    sl = open(sess_log_file, 'w+')
+    sl.switchFile(sess_log_file)
 
     sess_gps_file = ( '%s/session.gps' % session_dir )
-    gpsl = open(sess_gps_file, 'w+')
+    gpsl = Logger(sess_gps_file)
 
+    led=LED(led_pin)
 
-    loggit(sl, "Initializing camera")
+    sl.say("Initializing camera")
     camera.start_preview()
     camera.resolution = (1600, 1200)
     time.sleep(10)
     #camera.capture('test_pic.jpg')
 
-    loggit(sl, "Opening GPS data stream")
+    sl.say("Opening GPS data stream")
 
     reader = GPStream(sl)
     if not reader.isOpen():
-        loggit(sl, "ERROR!: Could not open GPS data stream")
+        sl.say("ERROR!: Could not open GPS data stream")
         sys.exit(1)
 
     # It seems that there may be a certain amount of flushing needed
     # initially to get the old values out of the stream. We don't want
     # to immediately take a slew of pictures just because of "old" data
+    # or have the picture associated with the wrong GPS data.
     reader.readBuffer()
 
     working_dir = session_dir
     idx = 0  # index number for naming the output files
     sdx = 0  # subdirectory index number for naming the subdirectories
-    gps_data = ''
     buf = ''
     line = ''
 
-    loggit(sl, "Reading GPS data stream")
+    sl.say("Reading GPS data stream")
 
     t0 = time.time()
     t1 = time.time()
@@ -185,14 +230,15 @@ def main ():
 
         # Are we testing and is the test over?
         if testing and idx > 10:
-            loggit(sl, "Test run finished")
+            sl.say("Test run finished")
             sys.exit()
 
         # Set the working dir to sub-directory to keep the files per
-        # directory to a reasonable quantity. Half an hour should result
-        # in 1800 files (900 images and 900 GPS data files).
-        if int ( idx / 900 ) + 1 != sdx:
-            sdx = int ( idx / 900 ) + 1
+        # directory to a reasonable quantity. 1800 pictures should
+        # correspond to one hour of data so there *should* end up being
+        # one directory for every hour (or portion thereof) of data.
+        if int ( idx / 1800 ) + 1 != sdx:
+            sdx = int ( idx / 1800 ) + 1
 
             working_dir = os.path.join(session_dir, "%04i" % sdx)
 
@@ -200,15 +246,15 @@ def main ():
                 os.makedirs(working_dir)
 
             if not os.path.exists(working_dir):
-                loggit(sl, "Unable to create working directory %s" % working_dir)
+                sl.say("Unable to create working directory %s" % working_dir)
                 sys.exit(1)
 
-            loggit(sl, "Working directory is now %s" % working_dir)
+            sl.say("Working directory is now %s" % working_dir)
 
         # Feed the buffer
         buf = buf + reader.readBuffer()
 
-        # Have we read one or more nmea lines into our buffer?
+        # Have we read one or more lines data into our buffer?
         while re.search("\n", buf):
 
             # Grab the first line from the buffer
@@ -217,47 +263,39 @@ def main ():
             # For the GPS hat at least, the first line out for a
             # given point in time will be the $GPGGA line. Therefore
             # we can use that to ensure that the readings are all for
-            # the same moment in time.
-            if line.find("GGA") > 0:
+            # the same moment in time. This assumes of course that the
+            # GPS hat is behaving and that there is good output from the
+            # serial reader (NOT always guaranteed).
+            # If we aren't getting GPS data then we would still like a
+            # picture every pic_int seconds...
+            tdiff = time.time() - t1
 
-                # Remember that we only want to take a picture every
-                # pic_int seconds
+            if ( line.find("GGA") > 0 and tdiff >= pic_int - 0.1 ) or ( tdiff >= pic_int + 0.1 ):
+                # We either have read a "GGA" line and the time is close
+                # enough OR we haven't read a "GGA" line and the time is
+                # over the time limit.
 
-                # We want to take a picture every pic_int seconds.
-                # Testing indicates that pic_int == 2 and if we
-                # compare >= 2 then it will sometimes be three seconds
-                # between pictures and if we compare > 1 then it will
-                # sometimes be only one second between pictures.
-                # Testing against a value just a bit under 2 (like 1.9)
-                # should work just fine.
-                if time.time() - t1 >= pic_int - 0.2:
+                # Reset the timer value t1. Do this first so the time to
+                # take the picture doesn't skew the time between pictures.
+                t1 = time.time()
 
-                    # Write the previous GPS data
-                    t_run = time.time() - t0
+                # Take the current picture
+                idx = idx + 1
+                pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
+                gpsl.say("PICTURE:" + pic_file)
+                gpsl.say("TDIFF: {}".format(tdiff))
 
-                    # Take the current picture
-                    idx = idx + 1
-                    pic_file = ( '%s/%08i.jpg' % (working_dir, idx) )
-                    gpsl.write("PICTURE:" + pic_file + "\r\n")
-                    gpsl.flush()
+                try:
+                    camera.capture(pic_file)
+                    led.flash()
 
-                    try:
-                        camera.capture(pic_file)
-                        gpio.output(led, True)
-                        time.sleep(0.1)
+                except Exception, e:
+                    sl.say("ERROR! Could not take a picture for '{}': {}".format(pic_file, e))
+                    pass
 
-                    except Exception, e:
-                        loggit(sl, "ERROR! Could not take a picture for %s" % pic_file)
-                        loggit(sl, e)
-                        pass
+                led.off()
 
-                    gpio.output(led, False)
-
-                    # Reset our timer value t1
-                    t1 = time.time()
-
-            gpsl.write(line + "\n")
-            gpsl.flush()
+            gpsl.say(line)
 
 if __name__ == '__main__':
     main()
